@@ -892,6 +892,80 @@ a {
 }
 
 /* =========================================================
+  Date Range Filter
+  ========================================================= */
+
+.date-range-filter {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.date-filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.date-filter-field label {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.date-filter-field input {
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 12px;
+  outline: none;
+}
+
+.date-filter-field input:focus {
+  border-color: var(--aws-orange);
+  box-shadow: 0 0 0 3px rgba(255, 153, 0, 0.1);
+}
+
+.date-filter-apply,
+.date-filter-reset {
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.date-filter-apply {
+  border: 1px solid var(--aws-orange);
+  background: var(--aws-orange);
+  color: var(--aws-navy);
+}
+
+.date-filter-reset {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
+}
+
+.date-filter-apply:hover {
+  opacity: 0.9;
+}
+
+.date-filter-reset:hover {
+  background: var(--surface-secondary);
+}
+
+/* =========================================================
    Common Components
    ========================================================= */
 
@@ -1145,4 +1219,16 @@ a {
   .service-sort {
     width: 100%;
   }
+
+  .date-range-filter {
+    flex-direction: column;
+    align-items: stretch;
+}
+
+.date-filter-field input,
+.date-filter-apply,
+.date-filter-reset {
+  width: 100%;
+}
+
 }

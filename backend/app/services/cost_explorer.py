@@ -1,4 +1,5 @@
 import os
+
 from datetime import date, timedelta
 
 import boto3
@@ -38,17 +39,55 @@ class CostExplorerService:
     }
 
     MOCK_DAILY_WEIGHTS = [
-        0.92, 0.95, 0.97, 0.94, 0.98,
-        1.01, 0.96, 0.99, 1.03, 0.97,
-        1.00, 1.02, 1.04, 0.98, 0.96,
-        1.01, 1.03, 1.05, 1.00, 1.02,
-        1.04, 1.01, 1.06, 1.03, 1.07,
-        1.05, 1.08, 1.04, 1.06, 1.09,
+        0.92,
+        0.95,
+        0.97,
+        0.94,
+        0.98,
+        1.01,
+        0.96,
+        0.99,
+        1.03,
+        0.97,
+        1.00,
+        1.02,
+        1.04,
+        0.98,
+        0.96,
+        1.01,
+        1.03,
+        1.05,
+        1.00,
+        1.02,
+        1.04,
+        1.01,
+        1.06,
+        1.03,
+        1.07,
+        1.05,
+        1.08,
+        1.04,
+        1.06,
+        1.09,
     ]
 
-    def __init__(self):
-        self.mode = os.getenv("COST_DATA_MODE", "auto").lower()
-        self.region = os.getenv("AWS_REGION", "us-east-1")
+    def __init__(
+        self,
+        start_date=None,
+        end_date=None,
+    ):
+        self.mode = os.getenv(
+            "COST_DATA_MODE",
+            "auto",
+        ).lower()
+
+        self.region = os.getenv(
+            "AWS_REGION",
+            "us-east-1",
+        )
+
+        self.start_date = start_date
+        self.end_date = end_date
 
         if self.mode not in {"aws", "mock", "auto"}:
             raise ValueError(
@@ -169,7 +208,10 @@ class CostExplorerService:
             )
 
         daily_average = (
-            round(total_cost / len(daily_costs), 2)
+            round(
+                total_cost / len(daily_costs),
+                2,
+            )
             if daily_costs
             else 0.0
         )
@@ -388,15 +430,43 @@ class CostExplorerService:
     # ------------------------------------------------------------------
 
     def _get_mock_service_costs(self):
-        total_cost = sum(
+        base_total_cost = sum(
             self.MOCK_SERVICE_COSTS.values()
+        )
+
+        start_date = self._get_start_date()
+        end_date = self._get_end_date()
+
+        number_of_days = (
+            end_date - start_date
+        ).days
+
+        if number_of_days <= 0:
+            return []
+
+        base_days = len(
+            self.MOCK_DAILY_WEIGHTS
+        )
+
+        range_multiplier = (
+            number_of_days / base_days
+        )
+
+        total_cost = (
+            base_total_cost
+            * range_multiplier
         )
 
         services = []
 
-        for service_name, cost in (
+        for service_name, base_cost in (
             self.MOCK_SERVICE_COSTS.items()
         ):
+            cost = (
+                base_cost
+                * range_multiplier
+            )
+
             percentage = (
                 cost / total_cost * 100
                 if total_cost > 0
@@ -425,6 +495,25 @@ class CostExplorerService:
             reverse=True,
         )
 
+        # Correct rounding difference so service totals
+        # remain consistent with the selected date range.
+        rounded_total = sum(
+            item["cost"]
+            for item in services
+        )
+
+        difference = round(
+            total_cost - rounded_total,
+            2,
+        )
+
+        if services:
+            services[0]["cost"] = round(
+                services[0]["cost"]
+                + difference,
+                2,
+            )
+
         return services
 
     def _get_mock_daily_costs(self):
@@ -432,16 +521,47 @@ class CostExplorerService:
             self.MOCK_SERVICE_COSTS.values()
         )
 
+        start_date = self._get_start_date()
+        end_date = self._get_end_date()
+
+        # _get_end_date() is exclusive because it
+        # follows AWS Cost Explorer date semantics.
+        number_of_days = (
+            end_date - start_date
+        ).days
+
+        if number_of_days <= 0:
+            return []
+
+        # Repeat the deterministic weight pattern when
+        # the selected range is longer than 30 days.
+        daily_weights = [
+            self.MOCK_DAILY_WEIGHTS[
+                index % len(self.MOCK_DAILY_WEIGHTS)
+            ]
+            for index in range(number_of_days)
+        ]
+
         weight_total = sum(
+            daily_weights
+        )
+
+        base_days = len(
             self.MOCK_DAILY_WEIGHTS
         )
 
-        start_date = self._get_start_date()
+        # Scale the mock total according to the
+        # selected number of days.
+        range_total_cost = (
+            total_cost
+            * number_of_days
+            / base_days
+        )
 
         daily_costs = []
 
         for day_number, weight in enumerate(
-            self.MOCK_DAILY_WEIGHTS
+            daily_weights
         ):
             current_date = (
                 start_date
@@ -449,7 +569,7 @@ class CostExplorerService:
             )
 
             cost = (
-                total_cost
+                range_total_cost
                 * weight
                 / weight_total
             )
@@ -470,15 +590,16 @@ class CostExplorerService:
         )
 
         difference = round(
-            total_cost - rounded_total,
+            range_total_cost - rounded_total,
             2,
         )
 
-        daily_costs[-1]["cost"] = round(
-            daily_costs[-1]["cost"]
-            + difference,
-            2,
-        )
+        if daily_costs:
+            daily_costs[-1]["cost"] = round(
+                daily_costs[-1]["cost"]
+                + difference,
+                2,
+            )
 
         return daily_costs
 
@@ -486,13 +607,15 @@ class CostExplorerService:
     # Date helpers
     # ------------------------------------------------------------------
 
-    @staticmethod
-    def _get_end_date():
+    def _get_end_date(self):
         # Cost Explorer End date is exclusive.
+        if self.end_date is not None:
+            return self.end_date + timedelta(days=1)
+
         return date.today()
 
-    @staticmethod
-    def _get_start_date():
-        return date.today() - timedelta(
-            days=30
-        )
+    def _get_start_date(self):
+        if self.start_date is not None:
+            return self.start_date
+
+        return date.today() - timedelta(days=30)

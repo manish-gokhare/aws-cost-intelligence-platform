@@ -8,6 +8,7 @@ import ServiceTable from "../components/dashboard/ServiceTable";
 
 import Loading from "../components/common/Loading";
 import ErrorMessage from "../components/common/ErrorMessage";
+import DateRangeFilter from "../components/common/DateRangeFilter";
 
 import { fetchCostDashboard } from "../services/costApi";
 
@@ -18,12 +19,21 @@ function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+
+  const [appliedStartDate, setAppliedStartDate] = useState("");
+  const [appliedEndDate, setAppliedEndDate] = useState("");
+
   const loadDashboard = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
 
-      const dashboardData = await fetchCostDashboard();
+      const dashboardData = await fetchCostDashboard({
+        startDate: appliedStartDate || undefined,
+        endDate: appliedEndDate || undefined,
+      });
 
       setData(dashboardData);
     } catch (err) {
@@ -36,11 +46,28 @@ function Dashboard() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [appliedStartDate, appliedEndDate]);
 
   useEffect(() => {
     loadDashboard();
   }, [loadDashboard]);
+
+  const handleApply = () => {
+    if (startDate && endDate && startDate > endDate) {
+      setError("Start date cannot be after end date.");
+      return;
+    }
+
+    setAppliedStartDate(startDate);
+    setAppliedEndDate(endDate);
+  };
+
+  const handleReset = () => {
+    setStartDate("");
+    setEndDate("");
+    setAppliedStartDate("");
+    setAppliedEndDate("");
+  };
 
   if (loading) {
     return (
@@ -53,6 +80,15 @@ function Dashboard() {
   if (error) {
     return (
       <div className="dashboard-page">
+        <DateRangeFilter
+          startDate={startDate}
+          endDate={endDate}
+          onStartDateChange={setStartDate}
+          onEndDateChange={setEndDate}
+          onApply={handleApply}
+          onReset={handleReset}
+        />
+
         <ErrorMessage message={error} />
 
         <button
@@ -79,6 +115,15 @@ function Dashboard() {
 
   return (
     <div className="dashboard-page">
+      <DateRangeFilter
+        startDate={startDate}
+        endDate={endDate}
+        onStartDateChange={setStartDate}
+        onEndDateChange={setEndDate}
+        onApply={handleApply}
+        onReset={handleReset}
+      />
+
       <div className="dashboard-header">
         <div>
           <h1>AWS Cost Overview</h1>
