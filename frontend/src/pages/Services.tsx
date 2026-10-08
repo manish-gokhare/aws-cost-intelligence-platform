@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import Loading from "../components/common/Loading";
 import ErrorMessage from "../components/common/ErrorMessage";
+import CostSummaryCard from "../components/dashboard/CostSummaryCard";
 import ServiceTable from "../components/dashboard/ServiceTable";
 
 import type { ServiceCost } from "../types/cost";
@@ -66,16 +67,46 @@ function Services() {
     );
   }
 
+  const totalCost = services.reduce(
+    (total, service) => total + service.cost,
+    0,
+  );
+
+  const topService = services.reduce<ServiceCost | null>(
+    (top, service) => {
+      if (!top || service.cost > top.cost) {
+        return service;
+      }
+
+      return top;
+    },
+    null,
+  );
+
+  const currency = services[0]?.currency ?? "USD";
+
   return (
     <div className="dashboard-page">
       <div className="dashboard-header">
         <div>
           <h1>AWS Services</h1>
           <p>
-            Explore your AWS spending across individual
-            services.
+            Explore your AWS spending across individual services.
           </p>
         </div>
+      </div>
+
+      <div className="summary-grid">
+        <CostSummaryCard
+          title="Total Cost"
+          value={totalCost}
+          currency={currency}
+        />
+
+        <CostSummaryCard
+          title="Top Service"
+          value={topService?.serviceName ?? "N/A"}
+        />
       </div>
 
       <div className="dashboard-card">

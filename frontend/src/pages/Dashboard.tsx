@@ -106,11 +106,6 @@ function Dashboard() {
           title="Top Service"
           value={summary.topService}
         />
-
-        <CostSummaryCard
-          title="Services"
-          value={summary.serviceCount}
-        />
       </div>
 
       <div className="dashboard-grid">
