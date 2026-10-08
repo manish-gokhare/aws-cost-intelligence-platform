@@ -167,9 +167,7 @@ a {
 
 .sidebar-brand span {
   margin-top: 2px;
-
   color: #94a3b8;
-
   font-size: 11px;
 }
 
@@ -255,7 +253,6 @@ a {
   gap: 8px;
 
   color: #94a3b8;
-
   font-size: 11px;
 }
 
@@ -820,6 +817,81 @@ a {
 }
 
 /* =========================================================
+   Service Controls
+   ========================================================= */
+
+.service-controls {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+
+  margin-bottom: 20px;
+}
+
+.service-search,
+.service-sort {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.service-search {
+  flex: 1;
+}
+
+.service-sort {
+  width: 220px;
+}
+
+.service-search label,
+.service-sort label {
+  color: var(--text-secondary);
+
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.service-search input,
+.service-sort select {
+  height: 38px;
+
+  padding: 0 12px;
+
+  border: 1px solid var(--border);
+  border-radius: 7px;
+
+  background: var(--surface);
+
+  color: var(--text-primary);
+
+  font-family: inherit;
+  font-size: 12px;
+
+  outline: none;
+
+  box-shadow: var(--shadow-sm);
+
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.service-search input {
+  width: 100%;
+}
+
+.service-search input::placeholder {
+  color: var(--text-muted);
+}
+
+.service-search input:focus,
+.service-sort select:focus {
+  border-color: var(--aws-orange);
+  box-shadow: 0 0 0 3px rgba(255, 153, 0, 0.1);
+}
+
+/* =========================================================
    Common Components
    ========================================================= */
 
@@ -1063,5 +1135,14 @@ a {
   .service-table td {
     padding-left: 14px;
     padding-right: 14px;
+  }
+
+  .service-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .service-sort {
+    width: 100%;
   }
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import Loading from "../components/common/Loading";
 import ErrorMessage from "../components/common/ErrorMessage";
@@ -11,8 +11,18 @@ const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ??
   "http://127.0.0.1:8000";
 
+type SortOption =
+  | "cost-desc"
+  | "cost-asc"
+  | "name-asc"
+  | "name-desc";
+
 function Services() {
   const [services, setServices] = useState<ServiceCost[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortOption, setSortOption] =
+    useState<SortOption>("cost-desc");
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -50,6 +60,41 @@ function Services() {
 
     loadServices();
   }, []);
+
+  const filteredAndSortedServices = useMemo(() => {
+    const normalizedSearch = searchTerm
+      .trim()
+      .toLowerCase();
+
+    const filtered = services.filter((service) =>
+      service.serviceName
+        .toLowerCase()
+        .includes(normalizedSearch),
+    );
+
+    return [...filtered].sort((a, b) => {
+      switch (sortOption) {
+        case "cost-asc":
+          return a.cost - b.cost;
+
+        case "cost-desc":
+          return b.cost - a.cost;
+
+        case "name-asc":
+          return a.serviceName.localeCompare(
+            b.serviceName,
+          );
+
+        case "name-desc":
+          return b.serviceName.localeCompare(
+            a.serviceName,
+          );
+
+        default:
+          return 0;
+      }
+    });
+  }, [services, searchTerm, sortOption]);
 
   if (loading) {
     return (
@@ -109,8 +154,60 @@ function Services() {
         />
       </div>
 
+      <div className="service-controls">
+        <div className="service-search">
+          <label htmlFor="service-search">
+            Search services
+          </label>
+
+          <input
+            id="service-search"
+            type="search"
+            placeholder="Search by service name..."
+            value={searchTerm}
+            onChange={(event) =>
+              setSearchTerm(event.target.value)
+            }
+          />
+        </div>
+
+        <div className="service-sort">
+          <label htmlFor="service-sort">
+            Sort by
+          </label>
+
+          <select
+            id="service-sort"
+            value={sortOption}
+            onChange={(event) =>
+              setSortOption(
+                event.target.value as SortOption,
+              )
+            }
+          >
+            <option value="cost-desc">
+              Cost: High to Low
+            </option>
+
+            <option value="cost-asc">
+              Cost: Low to High
+            </option>
+
+            <option value="name-asc">
+              Service: A to Z
+            </option>
+
+            <option value="name-desc">
+              Service: Z to A
+            </option>
+          </select>
+        </div>
+      </div>
+
       <div className="dashboard-card">
-        <ServiceTable data={services} />
+        <ServiceTable
+          data={filteredAndSortedServices}
+        />
       </div>
     </div>
   );
