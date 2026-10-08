@@ -14,74 +14,58 @@ router = APIRouter(
 def validate_date_range(
     start_date: date,
     end_date: date,
-):
+) -> None:
+    today = date.today()
+
     if start_date > end_date:
         raise HTTPException(
             status_code=400,
             detail="Start date cannot be after end date.",
         )
 
-
-@router.get("/dashboard")
-def get_cost_dashboard(
-    start_date: date | None = Query(
-        default=None,
-        description="Start date in YYYY-MM-DD format.",
-    ),
-    end_date: date | None = Query(
-        default=None,
-        description="End date in YYYY-MM-DD format.",
-    ),
-):
-    """
-    Return all data required by the cost dashboard.
-    """
-
-    try:
-        service = CostExplorerService(
-            start_date=start_date,
-            end_date=end_date,
+    if start_date > today:
+        raise HTTPException(
+            status_code=400,
+            detail="Start date cannot be in the future.",
         )
 
-        return service.get_dashboard_data()
-
-    except HTTPException:
-        raise
-
-    except Exception as exc:
+    if end_date > today:
         raise HTTPException(
-            status_code=500,
-            detail=(
-                "Unable to retrieve AWS cost "
-                f"dashboard: {str(exc)}"
-            ),
-        ) from exc
+            status_code=400,
+            detail="End date cannot be in the future.",
+        )
 
 
-@router.get("/summary")
-def get_cost_summary(
+@router.get("/dashboard")
+def get_dashboard(
     start_date: date | None = Query(default=None),
     end_date: date | None = Query(default=None),
 ):
-    try:
-        service = CostExplorerService(
-            start_date=start_date,
-            end_date=end_date,
-        )
+    if start_date is not None and end_date is not None:
+        validate_date_range(start_date, end_date)
 
-        return service.get_cost_summary()
+    service = CostExplorerService(
+        start_date=start_date,
+        end_date=end_date,
+    )
 
-    except HTTPException:
-        raise
+    return service.get_dashboard_data()
 
-    except Exception as exc:
-        raise HTTPException(
-            status_code=500,
-            detail=(
-                "Unable to retrieve AWS "
-                f"cost summary: {str(exc)}"
-            ),
-        ) from exc
+
+@router.get("/summary")
+def get_summary(
+    start_date: date | None = Query(default=None),
+    end_date: date | None = Query(default=None),
+):
+    if start_date is not None and end_date is not None:
+        validate_date_range(start_date, end_date)
+
+    service = CostExplorerService(
+        start_date=start_date,
+        end_date=end_date,
+    )
+
+    return service.get_summary()
 
 
 @router.get("/daily")
@@ -89,27 +73,15 @@ def get_daily_costs(
     start_date: date | None = Query(default=None),
     end_date: date | None = Query(default=None),
 ):
-    try:
-        service = CostExplorerService(
-            start_date=start_date,
-            end_date=end_date,
-        )
+    if start_date is not None and end_date is not None:
+        validate_date_range(start_date, end_date)
 
-        return {
-            "data": service.get_daily_costs()
-        }
+    service = CostExplorerService(
+        start_date=start_date,
+        end_date=end_date,
+    )
 
-    except HTTPException:
-        raise
-
-    except Exception as exc:
-        raise HTTPException(
-            status_code=500,
-            detail=(
-                "Unable to retrieve daily "
-                f"AWS costs: {str(exc)}"
-            ),
-        ) from exc
+    return service.get_daily_costs()
 
 
 @router.get("/services")
@@ -117,24 +89,12 @@ def get_service_costs(
     start_date: date | None = Query(default=None),
     end_date: date | None = Query(default=None),
 ):
-    try:
-        service = CostExplorerService(
-            start_date=start_date,
-            end_date=end_date,
-        )
+    if start_date is not None and end_date is not None:
+        validate_date_range(start_date, end_date)
 
-        return {
-            "data": service.get_service_costs()
-        }
+    service = CostExplorerService(
+        start_date=start_date,
+        end_date=end_date,
+    )
 
-    except HTTPException:
-        raise
-
-    except Exception as exc:
-        raise HTTPException(
-            status_code=500,
-            detail=(
-                "Unable to retrieve AWS "
-                f"service costs: {str(exc)}"
-            ),
-        ) from exc
+    return service.get_service_costs()

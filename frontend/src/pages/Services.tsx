@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-import Loading from "../components/common/Loading";
+import DateRangeFilter from "../components/common/DateRangeFilter";
 import ErrorMessage from "../components/common/ErrorMessage";
-import CostSummaryCard from "../components/dashboard/CostSummaryCard";
+import Loading from "../components/common/Loading";
 import ServiceTable from "../components/dashboard/ServiceTable";
 
 import type { ServiceCost } from "../types/cost";
@@ -11,65 +11,90 @@ const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ??
   "http://127.0.0.1:8000";
 
-type SortOption =
-  | "cost-desc"
-  | "cost-asc"
-  | "name-asc"
-  | "name-desc";
-
 function Services() {
   const [services, setServices] = useState<ServiceCost[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [sortOption, setSortOption] =
-    useState<SortOption>("cost-desc");
-
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function loadServices() {
-      try {
-        setLoading(true);
-        setError(null);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
-        const response = await fetch(
-          `${API_BASE_URL}/api/v1/costs/services`,
-        );
+  const [appliedStartDate, setAppliedStartDate] = useState("");
+  const [appliedEndDate, setAppliedEndDate] = useState("");
 
-        if (!response.ok) {
-          throw new Error(
-            `Failed to fetch service costs: ${response.status} ${response.statusText}`,
-          );
-        }
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortOption, setSortOption] = useState("cost-desc");
 
-        const result: { data: ServiceCost[] } =
-          await response.json();
+  const loadServices = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-        setServices(result.data);
-      } catch (err) {
-        const message =
-          err instanceof Error
-            ? err.message
-            : "Unable to load AWS service costs.";
+      const params = new URLSearchParams();
 
-        setError(message);
-      } finally {
-        setLoading(false);
+      if (appliedStartDate) {
+        params.set("start_date", appliedStartDate);
       }
+
+      if (appliedEndDate) {
+        params.set("end_date", appliedEndDate);
+      }
+
+      const queryString = params.toString();
+
+      const url = queryString
+        ? `${API_BASE_URL}/api/v1/costs/services?${queryString}`
+        : `${API_BASE_URL}/api/v1/costs/services`;
+
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        throw new Error(
+          `Failed to fetch service costs: ${response.status} ${response.statusText}`,
+        );
+      }
+
+      const data = await response.json();
+
+      setServices(data);
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Unable to load service costs.";
+
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  }, [appliedStartDate, appliedEndDate]);
+
+  useEffect(() => {
+    loadServices();
+  }, [loadServices]);
+
+  const handleApply = () => {
+    if (startDate && endDate && startDate > endDate) {
+      setError("Start date cannot be after end date.");
+      return;
     }
 
-    loadServices();
-  }, []);
+    setAppliedStartDate(startDate);
+    setAppliedEndDate(endDate);
+  };
+
+  const handleReset = () => {
+    setStartDate("");
+    setEndDate("");
+    setAppliedStartDate("");
+    setAppliedEndDate("");
+  };
 
   const filteredAndSortedServices = useMemo(() => {
-    const normalizedSearch = searchTerm
-      .trim()
-      .toLowerCase();
-
     const filtered = services.filter((service) =>
       service.serviceName
         .toLowerCase()
-        .includes(normalizedSearch),
+        .includes(searchTerm.toLowerCase()),
     );
 
     return [...filtered].sort((a, b) => {
@@ -77,28 +102,32 @@ function Services() {
         case "cost-asc":
           return a.cost - b.cost;
 
-        case "cost-desc":
-          return b.cost - a.cost;
-
         case "name-asc":
-          return a.serviceName.localeCompare(
-            b.serviceName,
-          );
+          return a.serviceName.localeCompare(b.serviceName);
 
         case "name-desc":
-          return b.serviceName.localeCompare(
-            a.serviceName,
-          );
+          return b.serviceName.localeCompare(a.serviceName);
 
+        case "cost-desc":
         default:
-          return 0;
+          return b.cost - a.cost;
       }
     });
   }, [services, searchTerm, sortOption]);
 
+  const totalCost = services.reduce(
+    (total, service) => total + service.cost,
+    0,
+  );
+
+  const topService =
+    services.length > 0
+      ? [...services].sort((a, b) => b.cost - a.cost)[0]
+      : null;
+
   if (loading) {
     return (
-      <div className="dashboard-page">
+      <div className="page-container">
         <Loading />
       </div>
     );
@@ -106,83 +135,84 @@ function Services() {
 
   if (error) {
     return (
-      <div className="dashboard-page">
+      <div className="page-container">
+        <DateRangeFilter
+          startDate={startDate}
+          endDate={endDate}
+          onStartDateChange={setStartDate}
+          onEndDateChange={setEndDate}
+          onApply={handleApply}
+          onReset={handleReset}
+        />
+
         <ErrorMessage message={error} />
+
+        <button
+          type="button"
+          onClick={loadServices}
+          className="retry-button"
+        >
+          Retry
+        </button>
       </div>
     );
   }
 
-  const totalCost = services.reduce(
-    (total, service) => total + service.cost,
-    0,
-  );
-
-  const topService = services.reduce<ServiceCost | null>(
-    (top, service) => {
-      if (!top || service.cost > top.cost) {
-        return service;
-      }
-
-      return top;
-    },
-    null,
-  );
-
-  const currency = services[0]?.currency ?? "USD";
-
   return (
-    <div className="dashboard-page">
-      <div className="dashboard-header">
+    <div className="page-container">
+      <DateRangeFilter
+        startDate={startDate}
+        endDate={endDate}
+        onStartDateChange={setStartDate}
+        onEndDateChange={setEndDate}
+        onApply={handleApply}
+        onReset={handleReset}
+      />
+
+      <div className="page-header">
         <div>
-          <h1>AWS Services</h1>
-          <p>
-            Explore your AWS spending across individual services.
-          </p>
+          <h1>Services</h1>
+          <p>View AWS spending by service.</p>
         </div>
       </div>
 
       <div className="summary-grid">
-        <CostSummaryCard
-          title="Total Cost"
-          value={totalCost}
-          currency={currency}
-        />
+        <div className="summary-card">
+          <div className="summary-card-label">
+            Total Cost
+          </div>
 
-        <CostSummaryCard
-          title="Top Service"
-          value={topService?.serviceName ?? "N/A"}
-        />
+          <div className="summary-card-value">
+            ${totalCost.toFixed(2)}
+          </div>
+        </div>
+
+        <div className="summary-card">
+          <div className="summary-card-label">
+            Top Service
+          </div>
+
+          <div className="summary-card-value">
+            {topService?.serviceName ?? "—"}
+          </div>
+        </div>
       </div>
 
-      <div className="service-controls">
-        <div className="service-search">
-          <label htmlFor="service-search">
-            Search services
-          </label>
-
+      <div className="dashboard-card">
+        <div className="service-controls">
           <input
-            id="service-search"
-            type="search"
-            placeholder="Search by service name..."
+            type="text"
+            placeholder="Search services..."
             value={searchTerm}
             onChange={(event) =>
               setSearchTerm(event.target.value)
             }
           />
-        </div>
-
-        <div className="service-sort">
-          <label htmlFor="service-sort">
-            Sort by
-          </label>
 
           <select
-            id="service-sort"
             value={sortOption}
             onChange={(event) =>
-              setSortOption(
-                event.target.value as SortOption,
-              )
+              setSortOption(event.target.value)
             }
           >
             <option value="cost-desc">
@@ -194,17 +224,15 @@ function Services() {
             </option>
 
             <option value="name-asc">
-              Service: A to Z
+              Service: A-Z
             </option>
 
             <option value="name-desc">
-              Service: Z to A
+              Service: Z-A
             </option>
           </select>
         </div>
-      </div>
 
-      <div className="dashboard-card">
         <ServiceTable
           data={filteredAndSortedServices}
         />

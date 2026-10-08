@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-import Loading from "../components/common/Loading";
+import DateRangeFilter from "../components/common/DateRangeFilter";
 import ErrorMessage from "../components/common/ErrorMessage";
-import TopCostDrivers from "../components/dashboard/TopCostDrivers";
+import Loading from "../components/common/Loading";
 
 import type { CostDriver } from "../types/cost";
 
@@ -10,69 +10,90 @@ const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ??
   "http://127.0.0.1:8000";
 
-interface DashboardResponse {
-  topCostDrivers: CostDriver[];
-}
-
-type SortOption =
-  | "cost-desc"
-  | "cost-asc"
-  | "change-desc"
-  | "change-asc";
-
 function CostDrivers() {
   const [drivers, setDrivers] = useState<CostDriver[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [sortOption, setSortOption] =
-    useState<SortOption>("cost-desc");
-
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function loadCostDrivers() {
-      try {
-        setLoading(true);
-        setError(null);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
-        const response = await fetch(
-          `${API_BASE_URL}/api/v1/costs/dashboard`,
-        );
+  const [appliedStartDate, setAppliedStartDate] = useState("");
+  const [appliedEndDate, setAppliedEndDate] = useState("");
 
-        if (!response.ok) {
-          throw new Error(
-            `Failed to fetch cost drivers: ${response.status} ${response.statusText}`,
-          );
-        }
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortOption, setSortOption] = useState("cost-desc");
 
-        const result: DashboardResponse =
-          await response.json();
+  const loadCostDrivers = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-        setDrivers(result.topCostDrivers);
-      } catch (err) {
-        const message =
-          err instanceof Error
-            ? err.message
-            : "Unable to load AWS cost drivers.";
+      const params = new URLSearchParams();
 
-        setError(message);
-      } finally {
-        setLoading(false);
+      if (appliedStartDate) {
+        params.set("start_date", appliedStartDate);
       }
+
+      if (appliedEndDate) {
+        params.set("end_date", appliedEndDate);
+      }
+
+      const queryString = params.toString();
+
+      const url = queryString
+        ? `${API_BASE_URL}/api/v1/costs/dashboard?${queryString}`
+        : `${API_BASE_URL}/api/v1/costs/dashboard`;
+
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        throw new Error(
+          `Failed to fetch cost drivers: ${response.status} ${response.statusText}`,
+        );
+      }
+
+      const data = await response.json();
+
+      setDrivers(data.topCostDrivers);
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Unable to load cost drivers.";
+
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  }, [appliedStartDate, appliedEndDate]);
+
+  useEffect(() => {
+    loadCostDrivers();
+  }, [loadCostDrivers]);
+
+  const handleApply = () => {
+    if (startDate && endDate && startDate > endDate) {
+      setError("Start date cannot be after end date.");
+      return;
     }
 
-    loadCostDrivers();
-  }, []);
+    setAppliedStartDate(startDate);
+    setAppliedEndDate(endDate);
+  };
+
+  const handleReset = () => {
+    setStartDate("");
+    setEndDate("");
+    setAppliedStartDate("");
+    setAppliedEndDate("");
+  };
 
   const filteredAndSortedDrivers = useMemo(() => {
-    const normalizedSearch = searchTerm
-      .trim()
-      .toLowerCase();
-
     const filtered = drivers.filter((driver) =>
       driver.serviceName
         .toLowerCase()
-        .includes(normalizedSearch),
+        .includes(searchTerm.toLowerCase()),
     );
 
     return [...filtered].sort((a, b) => {
@@ -80,30 +101,22 @@ function CostDrivers() {
         case "cost-asc":
           return a.cost - b.cost;
 
-        case "cost-desc":
-          return b.cost - a.cost;
-
         case "change-desc":
-          return (
-            b.changePercentage -
-            a.changePercentage
-          );
+          return b.changePercentage - a.changePercentage;
 
         case "change-asc":
-          return (
-            a.changePercentage -
-            b.changePercentage
-          );
+          return a.changePercentage - b.changePercentage;
 
+        case "cost-desc":
         default:
-          return 0;
+          return b.cost - a.cost;
       }
     });
   }, [drivers, searchTerm, sortOption]);
 
   if (loading) {
     return (
-      <div className="dashboard-page">
+      <div className="page-container">
         <Loading />
       </div>
     );
@@ -111,53 +124,65 @@ function CostDrivers() {
 
   if (error) {
     return (
-      <div className="dashboard-page">
+      <div className="page-container">
+        <DateRangeFilter
+          startDate={startDate}
+          endDate={endDate}
+          onStartDateChange={setStartDate}
+          onEndDateChange={setEndDate}
+          onApply={handleApply}
+          onReset={handleReset}
+        />
+
         <ErrorMessage message={error} />
+
+        <button
+          type="button"
+          onClick={loadCostDrivers}
+          className="retry-button"
+        >
+          Retry
+        </button>
       </div>
     );
   }
 
   return (
-    <div className="dashboard-page">
-      <div className="dashboard-header">
+    <div className="page-container">
+      <DateRangeFilter
+        startDate={startDate}
+        endDate={endDate}
+        onStartDateChange={setStartDate}
+        onEndDateChange={setEndDate}
+        onApply={handleApply}
+        onReset={handleReset}
+      />
+
+      <div className="page-header">
         <div>
           <h1>Cost Drivers</h1>
           <p>
             Identify the AWS services contributing most
-            to your cloud spending.
+            to your spending.
           </p>
         </div>
       </div>
 
-      <div className="service-controls">
-        <div className="service-search">
-          <label htmlFor="cost-driver-search">
-            Search services
-          </label>
-
+      <div className="dashboard-card">
+        <div className="service-controls">
           <input
-            id="cost-driver-search"
-            type="search"
-            placeholder="Search by service name..."
+            type="text"
+            placeholder="Search services..."
             value={searchTerm}
             onChange={(event) =>
               setSearchTerm(event.target.value)
             }
           />
-        </div>
-
-        <div className="service-sort">
-          <label htmlFor="cost-driver-sort">
-            Sort by
-          </label>
 
           <select
-            id="cost-driver-sort"
             value={sortOption}
             onChange={(event) =>
-              setSortOption(
-                event.target.value as SortOption,
-              )
+              setSortOption(event.target.value)
             }
           >
             <option value="cost-desc">
@@ -177,12 +202,44 @@ function CostDrivers() {
             </option>
           </select>
         </div>
-      </div>
 
-      <div className="dashboard-card">
-        <TopCostDrivers
-          data={filteredAndSortedDrivers}
-        />
+        <div className="cost-driver-list">
+          {filteredAndSortedDrivers.map((driver) => (
+            <div
+              className="cost-driver-row"
+              key={driver.serviceName}
+            >
+              <div className="cost-driver-rank">
+                #{driver.rank}
+              </div>
+
+              <div className="cost-driver-service">
+                <strong>{driver.serviceName}</strong>
+
+                <span>
+                  {driver.percentageOfTotal.toFixed(1)}% of total
+                </span>
+              </div>
+
+              <div className="cost-driver-cost">
+                <strong>
+                  ${driver.cost.toFixed(2)}
+                </strong>
+
+                <span>
+                  {driver.changePercentage >= 0 ? "+" : ""}
+                  {driver.changePercentage.toFixed(1)}%
+                </span>
+              </div>
+            </div>
+          ))}
+
+          {filteredAndSortedDrivers.length === 0 && (
+            <div className="empty-state">
+              No cost drivers found.
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
